@@ -1,0 +1,11 @@
+token.json
+.env
+credentials.json
+__pycache__/
+*.pyc
+output.txt
+labels.txt
+edge_test.txt
+error_log.txt
+error_log2.txt
+.vscode/

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メール読み上げ</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="auth-screen">
+      <h1>メール読み上げ</h1>
+      <button id="btn-login">Googleアカウントでログイン</button>
+    </div>
+
+    <div id="main-screen" hidden>
+      <header id="top-bar">
+        <span id="status">読み込み中...</span>
+        <div id="font-controls">
+          <button id="btn-font-up" aria-label="文字を大きく">A+</button>
+          <button id="btn-font-down" aria-label="文字を小さく">A-</button>
+        </div>
+      </header>
+
+      <main id="email-display">
+        <div id="sender"></div>
+        <div id="date"></div>
+        <div id="subject"></div>
+        <div id="attachment"></div>
+        <div id="body"></div>
+      </main>
+
+      <nav id="controls" aria-label="操作ボタン">
+        <button id="btn-prev">◀ 前へ</button>
+        <button id="btn-play">▶ 再生</button>
+        <button id="btn-stop">■ 停止</button>
+        <button id="btn-repeat">↻ リピート</button>
+        <button id="btn-next">次へ ▶</button>
+        <button id="btn-refresh">🔄 更新</button>
+        <button id="btn-logout">ログアウト</button>
+      </nav>
+    </div>
+  </div>
+
+  <script src="js/utils.js?v=2"></script>
+  <script src="js/speech.js?v=2"></script>
+  <script src="js/gmail.js?v=2"></script>
+  <script src="js/ui.js?v=2"></script>
+  <script src="js/app.js?v=3"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python mail_reader_gui.py)",
+      "PowerShell(pip install *)",
+      "PowerShell(New-Item *)",
+      "PowerShell(python -m http.server 8080 --directory C:\\\\dev\\\\mail-reader\\\\docs)"
+    ]
+  }
+}
