@@ -10,6 +10,8 @@ echo.
 set "INSTALL_DIR=C:\mail-reader"
 set "REPO_URL=https://github.com/tranzact-dev/mail-reader.git"
 set "SCRIPT_DIR=%~dp0"
+set "PYTHON_URL=https://www.python.org/ftp/python/3.13.5/python-3.13.5-amd64.exe"
+set "GIT_URL=https://github.com/git-for-windows/git/releases/download/v2.49.0.windows.1/Git-2.49.0-64-bit.exe"
 
 :: --- Python チェック ---
 echo [1/5] Python を確認しています...
@@ -17,19 +19,23 @@ python --version >nul 2>&1
 if %errorlevel%==0 (
     for /f "tokens=2" %%v in ('python --version 2^>^&1') do echo       Python %%v インストール済み（スキップ）
 ) else (
-    echo       Python が見つかりません。インストールします...
-    if exist "%SCRIPT_DIR%python-3.13.5-amd64.exe" (
-        "%SCRIPT_DIR%python-3.13.5-amd64.exe" /quiet InstallAllUsers=1 PrependPath=1 Include_launcher=1
-        if %errorlevel%==0 (
-            echo       Python インストール完了
-        ) else (
-            echo       [エラー] Python のインストールに失敗しました
+    echo       Python が見つかりません。ダウンロードしてインストールします...
+    if not exist "%SCRIPT_DIR%python-3.13.5-amd64.exe" (
+        echo       ダウンロード中...
+        powershell -Command "Invoke-WebRequest -Uri '%PYTHON_URL%' -OutFile '%SCRIPT_DIR%python-3.13.5-amd64.exe'"
+        if not exist "%SCRIPT_DIR%python-3.13.5-amd64.exe" (
+            echo       [エラー] ダウンロードに失敗しました。インターネット接続を確認してください
             pause
             exit /b 1
         )
+        echo       ダウンロード完了
+    )
+    echo       インストール中...
+    "%SCRIPT_DIR%python-3.13.5-amd64.exe" /quiet InstallAllUsers=1 PrependPath=1 Include_launcher=1
+    if %errorlevel%==0 (
+        echo       Python インストール完了
     ) else (
-        echo       [エラー] python-3.13.5-amd64.exe が見つかりません
-        echo       https://www.python.org/downloads/ からダウンロードし、このフォルダに置いてください
+        echo       [エラー] Python のインストールに失敗しました
         pause
         exit /b 1
     )
@@ -43,19 +49,23 @@ git --version >nul 2>&1
 if %errorlevel%==0 (
     for /f "tokens=3" %%v in ('git --version') do echo       Git %%v インストール済み（スキップ）
 ) else (
-    echo       Git が見つかりません。インストールします...
-    if exist "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" (
-        "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" /VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="icons,ext\reg\shellhere,assoc,assoc_sh"
-        if %errorlevel%==0 (
-            echo       Git インストール完了
-        ) else (
-            echo       [エラー] Git のインストールに失敗しました
+    echo       Git が見つかりません。ダウンロードしてインストールします...
+    if not exist "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" (
+        echo       ダウンロード中...
+        powershell -Command "Invoke-WebRequest -Uri '%GIT_URL%' -OutFile '%SCRIPT_DIR%Git-2.49.0-64-bit.exe'"
+        if not exist "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" (
+            echo       [エラー] ダウンロードに失敗しました。インターネット接続を確認してください
             pause
             exit /b 1
         )
+        echo       ダウンロード完了
+    )
+    echo       インストール中...
+    "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" /VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="icons,ext\reg\shellhere,assoc,assoc_sh"
+    if %errorlevel%==0 (
+        echo       Git インストール完了
     ) else (
-        echo       [エラー] Git-2.49.0-64-bit.exe が見つかりません
-        echo       https://git-scm.com/downloads/win からダウンロードし、このフォルダに置いてください
+        echo       [エラー] Git のインストールに失敗しました
         pause
         exit /b 1
     )
