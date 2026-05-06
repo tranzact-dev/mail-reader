@@ -11,7 +11,7 @@
 
 ヘルパーさんにメールで以下の2ファイルを送る:
 
-1. **install.bat** — リポジトリに同梱済み
+1. **install.bat.txt** — install.bat の拡張子を `.txt` に変更して添付（Gmailが `.bat` をブロックするため）
 2. **.env** — 設定済みのものを用意
 
 `.env` の内容:
@@ -24,8 +24,9 @@ CASUAL_CONTACTS=
 
 ### 実行（ヘルパーさん）
 
-1. メールの添付ファイル（install.bat と .env）を同じフォルダに保存
-2. `install.bat` を右クリック →「管理者として実行」
+1. メールの添付ファイル（install.bat.txt と .env）を同じフォルダに保存
+2. `install.bat.txt` の拡張子 `.txt` を削除して `install.bat` にリネーム
+3. `install.bat` を右クリック →「管理者として実行」
 3. 完了を待つ（5〜10分）
 
 install.bat が自動で以下を実行します:
