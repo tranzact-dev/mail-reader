@@ -263,9 +263,9 @@ def send_reply(to_addr, subject, body, in_reply_to=""):
 
 # --- AI返信生成 ---
 
-def is_casual_contact(sender_name):
-    for name in CASUAL_CONTACTS:
-        if name in sender_name:
+def is_casual_contact(sender_email):
+    for addr in CASUAL_CONTACTS:
+        if addr.lower() == sender_email.lower():
             return True
     return False
 
@@ -895,7 +895,7 @@ class MailReaderApp:
                     past = get_past_emails(self.conn, email_data["sender_email"])
                 except Exception:
                     pass
-            casual = is_casual_contact(email_data["sender"])
+            casual = is_casual_contact(email_data["sender_email"])
             draft = generate_reply(
                 email_data["sender"],
                 email_data["subject"],

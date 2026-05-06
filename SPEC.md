@@ -115,7 +115,7 @@
 ANTHROPIC_API_KEY=sk-ant-api03-xxxxx    # Claude APIキー
 BIGLOBE_EMAIL=xxxxx@kyf.biglobe.ne.jp   # BIGLOBEメールアドレス
 BIGLOBE_PASSWORD=xxxxx                   # BIGLOBEパスワード
-CASUAL_CONTACTS=名前1,名前2              # くだけた口調にする差出人（カンマ区切り）
+CASUAL_CONTACTS=a@example.com,b@example.com  # くだけた口調にする差出人メールアドレス（カンマ区切り）
 ```
 
 ## 技術アーキテクチャ
