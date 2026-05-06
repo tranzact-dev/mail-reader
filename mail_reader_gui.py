@@ -1,89 +1,73 @@
 import os
-import base64
+import imaplib
+import email
+import email.header
 import re
 import threading
 import asyncio
 import tempfile
 import time
+from datetime import datetime, timedelta
 from email.utils import parseaddr, parsedate_to_datetime
 
 from dotenv import load_dotenv
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 import edge_tts
 import pygame
 import tkinter as tk
 
 load_dotenv()
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
-LABEL_NAME = "_親族/親父"
+IMAP_SERVER = "mail.biglobe.ne.jp"
+IMAP_PORT = 993
+BIGLOBE_EMAIL = os.getenv("BIGLOBE_EMAIL", "")
+BIGLOBE_PASSWORD = os.getenv("BIGLOBE_PASSWORD", "")
+DRY_RUN = True
+
 VOICE = "ja-JP-NanamiNeural"
 FONT_LARGE = ("Meiryo UI", 22)
 FONT_BUTTON = ("Meiryo UI", 20)
 FONT_STATUS = ("Meiryo UI", 16)
 
 
-# --- Gmail / メール処理 ---
+# --- IMAP / メール処理 ---
 
-def get_gmail_service():
-    creds = None
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+def decode_header_value(value):
+    if not value:
+        return ""
+    decoded_parts = email.header.decode_header(value)
+    result = []
+    for part, charset in decoded_parts:
+        if isinstance(part, bytes):
+            result.append(part.decode(charset or "utf-8", errors="replace"))
         else:
-            flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
-    return build("gmail", "v1", credentials=creds)
+            result.append(part)
+    return "".join(result)
 
 
-def get_label_id(service, label_name):
-    results = service.users().labels().list(userId="me").execute()
-    for label in results.get("labels", []):
-        if label["name"] == label_name:
-            return label["id"]
-    return None
+def connect_imap():
+    conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+    conn.login(BIGLOBE_EMAIL, BIGLOBE_PASSWORD)
+    return conn
 
 
-def get_unread_messages_grouped(service, label_id):
-    results = (
-        service.users()
-        .messages()
-        .list(userId="me", labelIds=[label_id], q="is:unread")
-        .execute()
-    )
-    messages = results.get("messages", [])
-    threads = {}
-    for msg in messages:
-        tid = msg.get("threadId")
-        if tid not in threads:
-            threads[tid] = []
-        threads[tid].append(msg)
-    for tid in threads:
-        threads[tid].reverse()
-    return list(threads.values())
+def get_unread_messages(conn, days=10):
+    conn.select("INBOX")
+    since = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
+    _, data = conn.search(None, f"UNSEEN SINCE {since}")
+    msg_ids = data[0].split()
+    return msg_ids
 
 
-def get_message_detail(service, msg_id):
-    msg = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
-    headers = msg["payload"]["headers"]
-    subject = ""
-    sender = ""
-    date_str = ""
-    for h in headers:
-        name = h["name"].lower()
-        if name == "subject":
-            subject = h["value"]
-        elif name == "from":
-            sender = h["value"]
-        elif name == "date":
-            date_str = h["value"]
+def get_message_detail(conn, msg_id):
+    _, data = conn.fetch(msg_id, "(BODY.PEEK[])")
+    raw = data[0][1]
+    msg = email.message_from_bytes(raw)
+
+    subject = decode_header_value(msg.get("Subject", ""))
+    sender_raw = decode_header_value(msg.get("From", ""))
+    date_str = msg.get("Date", "")
+
+    sender_name = parseaddr(sender_raw)[0] or sender_raw
 
     date_display = ""
     if date_str:
@@ -93,38 +77,54 @@ def get_message_detail(service, msg_id):
         except Exception:
             date_display = date_str
 
-    has_attachment = check_attachments(msg["payload"])
-    body = extract_body(msg["payload"])
-    sender_name = parseaddr(sender)[0] or sender
+    has_attachment = False
+    body = ""
+    for part in msg.walk():
+        content_disposition = str(part.get("Content-Disposition", ""))
+        if "attachment" in content_disposition:
+            has_attachment = True
+            continue
+        if part.get_content_type() == "text/plain" and not body:
+            charset = part.get_content_charset() or "utf-8"
+            payload = part.get_payload(decode=True)
+            if payload:
+                body = payload.decode(charset, errors="replace")
+
+    if not body:
+        for part in msg.walk():
+            if part.get_content_type() == "text/html":
+                charset = part.get_content_charset() or "utf-8"
+                payload = part.get_payload(decode=True)
+                if payload:
+                    body = payload.decode(charset, errors="replace")
+                    break
+
     return {
-        "id": msg_id, "sender": sender_name, "subject": subject,
-        "body": body, "date": date_display, "has_attachment": has_attachment,
+        "uid": msg_id,
+        "sender": sender_name,
+        "subject": subject,
+        "body": body,
+        "date": date_display,
+        "has_attachment": has_attachment,
     }
 
 
-def check_attachments(payload):
-    if payload.get("filename"):
-        return True
-    for part in payload.get("parts", []):
-        if part.get("filename"):
-            return True
-        if check_attachments(part):
-            return True
-    return False
+def normalize_subject(subject):
+    return re.sub(r"^(Re:\s*|Fwd?:\s*|転送:\s*)+", "", subject, flags=re.IGNORECASE).strip()
 
 
-def extract_body(payload):
-    if payload.get("body", {}).get("data"):
-        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="replace")
-    parts = payload.get("parts", [])
-    for part in parts:
-        if part["mimeType"] == "text/plain" and part.get("body", {}).get("data"):
-            return base64.urlsafe_b64decode(part["body"]["data"]).decode("utf-8", errors="replace")
-    for part in parts:
-        result = extract_body(part)
-        if result:
-            return result
-    return ""
+def group_by_thread(details):
+    threads = {}
+    for d in details:
+        key = normalize_subject(d["subject"])
+        if key not in threads:
+            threads[key] = []
+        threads[key].append(d)
+    return list(threads.values())
+
+
+def mark_as_read(conn, msg_id):
+    conn.store(msg_id, "+FLAGS", "\\Seen")
 
 
 def strip_quoted_text(text):
@@ -146,20 +146,22 @@ def strip_quoted_text(text):
 
 
 def clean_body_for_reading(body):
-    text = re.sub(r"<[^>]+>", "", body)
+    text = re.sub(r"<style[^>]*>.*?</style>", "", body, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<script[^>]*>.*?</script>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"&nbsp;", " ", text)
+    text = re.sub(r"&amp;", "&", text)
+    text = re.sub(r"&lt;", "<", text)
+    text = re.sub(r"&gt;", ">", text)
+    text = re.sub(r"&#\d+;", "", text)
+    text = re.sub(r"&\w+;", "", text)
     text = strip_quoted_text(text)
     text = re.sub(r"https?://\S+", "", text)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     lines = [line.strip() for line in text.split("\n")]
     text = "\n".join(lines).strip()
-    return text[:500]
-
-
-def mark_as_read(service, msg_id):
-    service.users().messages().modify(
-        userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
-    ).execute()
+    return text[:10000]
 
 
 # --- 音声エンジン（edge-tts + pygame + ハイライト） ---
@@ -267,7 +269,7 @@ class MailReaderApp:
             lambda sentence: self.root.after(0, self._highlight_sentence, sentence),
             lambda: self.root.after(0, self._clear_highlight),
         )
-        self.service = None
+        self.conn = None
         self.threads = []
         self.thread_index = 0
         self.msg_index = 0
@@ -285,7 +287,6 @@ class MailReaderApp:
         fg = "#e0e0e0"
         accent = "#4fc3f7"
 
-        # 上部バー（ステータス + フォントサイズ調整）
         top_frame = tk.Frame(self.root, bg=bg)
         top_frame.pack(fill="x")
 
@@ -304,11 +305,9 @@ class MailReaderApp:
                                      command=self._font_larger, **font_btn_style)
         self.btn_font_up.pack(side="right", padx=(0, 5), pady=5)
 
-        # ボタンエリア（先にpackして下部に固定）
         btn_frame = tk.Frame(self.root, bg=bg, pady=20)
         btn_frame.pack(side="bottom", fill="x")
 
-        # メール表示エリア
         display_frame = tk.Frame(self.root, bg=bg, padx=30, pady=10)
         display_frame.pack(fill="both", expand=True)
 
@@ -344,11 +343,6 @@ class MailReaderApp:
 
         btn_style = dict(font=FONT_BUTTON, width=12, height=2, relief="flat", cursor="hand2")
 
-        self.btn_prev = tk.Button(btn_frame, text="◀ 前へ", bg="#334155", fg=fg,
-                                  activebackground="#475569", activeforeground="white",
-                                  command=self._prev, **btn_style)
-        self.btn_prev.pack(side="left", padx=15, expand=True)
-
         self.btn_play = tk.Button(btn_frame, text="▶ 再生", bg="#1b5e20", fg="white",
                                   activebackground="#2e7d32", activeforeground="white",
                                   command=self._play, **btn_style)
@@ -359,12 +353,17 @@ class MailReaderApp:
                                   command=self._stop, **btn_style)
         self.btn_stop.pack(side="left", padx=15, expand=True)
 
-        self.btn_repeat = tk.Button(btn_frame, text="↻ リピート", bg="#e65100", fg="white",
+        self.btn_prev = tk.Button(btn_frame, text="⏪ 前へ", bg="#334155", fg=fg,
+                                  activebackground="#475569", activeforeground="white",
+                                  command=self._prev, **btn_style)
+        self.btn_prev.pack(side="left", padx=15, expand=True)
+
+        self.btn_repeat = tk.Button(btn_frame, text="↻ 聞き直す", bg="#e65100", fg="white",
                                     activebackground="#ef6c00", activeforeground="white",
                                     command=self._repeat, **btn_style)
         self.btn_repeat.pack(side="left", padx=15, expand=True)
 
-        self.btn_next = tk.Button(btn_frame, text="次へ ▶", bg="#334155", fg=fg,
+        self.btn_next = tk.Button(btn_frame, text="次へ ⏩", bg="#334155", fg=fg,
                                   activebackground="#475569", activeforeground="white",
                                   command=self._next, **btn_style)
         self.btn_next.pack(side="left", padx=15, expand=True)
@@ -379,9 +378,8 @@ class MailReaderApp:
                                   command=self._on_close, **btn_style)
         self.btn_quit.pack(side="left", padx=15, expand=True)
 
-        # タブオーダー設定
         self.btn_play.focus_set()
-        for btn in [self.btn_prev, self.btn_play, self.btn_stop, self.btn_repeat, self.btn_next,
+        for btn in [self.btn_play, self.btn_stop, self.btn_prev, self.btn_repeat, self.btn_next,
                      self.btn_refresh, self.btn_quit, self.btn_font_up, self.btn_font_down]:
             btn.bind("<Return>", lambda e, b=btn: b.invoke())
             btn.bind("<space>", lambda e, b=btn: b.invoke())
@@ -389,27 +387,20 @@ class MailReaderApp:
     def _load_emails(self):
         def load():
             try:
-                self.service = get_gmail_service()
-                label_id = get_label_id(self.service, LABEL_NAME)
-                if not label_id:
-                    self.root.after(0, lambda: self._show_message("ラベルが見つかりません"))
-                    return
-                thread_groups = get_unread_messages_grouped(self.service, label_id)
-                if not thread_groups:
+                self.conn = connect_imap()
+                msg_ids = get_unread_messages(self.conn)
+                if not msg_ids:
                     self.root.after(0, lambda: self._show_message("未読メールはありません"))
                     self.root.after(0, lambda: self.speech.speak("未読メールはありません。"))
                     return
-                threads = []
-                total_msgs = 0
-                for group in thread_groups:
-                    thread_emails = []
-                    for ref in group:
-                        detail = get_message_detail(self.service, ref["id"])
-                        detail["body_clean"] = clean_body_for_reading(detail["body"])
-                        thread_emails.append(detail)
-                        total_msgs += 1
-                    threads.append(thread_emails)
+                details = []
+                for mid in msg_ids:
+                    detail = get_message_detail(self.conn, mid)
+                    detail["body_clean"] = clean_body_for_reading(detail["body"])
+                    details.append(detail)
+                threads = group_by_thread(details)
                 self.threads = threads
+                total_msgs = sum(len(t) for t in threads)
                 n_threads = len(threads)
                 self._pending_announce = f"{n_threads}件のスレッドに{total_msgs}件の未読メールがあります。"
                 self.root.after(0, self._show_current)
@@ -441,8 +432,8 @@ class MailReaderApp:
         return self.threads[self.thread_index]
 
     def _show_current(self):
-        email = self._current_email()
-        if not email:
+        email_data = self._current_email()
+        if not email_data:
             return
         thread = self._current_thread()
         t_total = len(self.threads)
@@ -455,17 +446,17 @@ class MailReaderApp:
         else:
             self.status_var.set(f"スレッド {t_idx}/{t_total} — メール {m_idx}/{m_total}")
 
-        self.sender_var.set(f"差出人: {email['sender']}")
-        self.date_var.set(f"日時: {email['date']}")
-        self.subject_var.set(f"件名: {email['subject']}")
-        if email.get("has_attachment"):
+        self.sender_var.set(f"差出人: {email_data['sender']}")
+        self.date_var.set(f"日時: {email_data['date']}")
+        self.subject_var.set(f"件名: {email_data['subject']}")
+        if email_data.get("has_attachment"):
             self.attachment_var.set("📎 添付ファイルあり")
         else:
             self.attachment_var.set("")
 
         self.body_text.configure(state="normal")
         self.body_text.delete("1.0", "end")
-        self.body_text.insert("1.0", email["body_clean"])
+        self.body_text.insert("1.0", email_data["body_clean"])
         self.body_text.configure(state="disabled")
 
     def _highlight_sentence(self, sentence):
@@ -502,8 +493,8 @@ class MailReaderApp:
         self.body_text.configure(font=("Meiryo UI", self.font_size - 2))
 
     def _play(self):
-        email = self._current_email()
-        if not email:
+        email_data = self._current_email()
+        if not email_data:
             return
         thread = self._current_thread()
         self._highlight_search_pos = "1.0"
@@ -518,11 +509,11 @@ class MailReaderApp:
                 parts.append(f"スレッド{self.thread_index + 1}。{len(thread)}件の新着があります。")
             else:
                 parts.append(f"スレッド{self.thread_index + 1}。")
-        parts.append(f"{email['sender']}さんから。")
-        parts.append(f"件名、{email['subject']}。")
-        if email.get("has_attachment"):
+        parts.append(f"{email_data['sender']}さんから。")
+        parts.append(f"件名、{email_data['subject']}。")
+        if email_data.get("has_attachment"):
             parts.append("添付ファイルがあります。いつものメール画面でメールを開いて確認してください。")
-        parts.append(email["body_clean"])
+        parts.append(email_data["body_clean"])
         speech_text = "".join(parts)
         self._play_gen += 1
         gen = self._play_gen
@@ -537,7 +528,12 @@ class MailReaderApp:
 
     def _advance(self):
         thread = self._current_thread()
-        mark_as_read(self.service, self._current_email()["id"])
+        current = self._current_email()
+        if current and self.conn and not DRY_RUN:
+            try:
+                mark_as_read(self.conn, current["uid"])
+            except Exception:
+                pass
         if self.msg_index < len(thread) - 1:
             self.msg_index += 1
             return True
@@ -565,7 +561,12 @@ class MailReaderApp:
             self._show_current()
             self._play()
         else:
-            mark_as_read(self.service, self._current_email()["id"])
+            current = self._current_email()
+            if current and self.conn and not DRY_RUN:
+                try:
+                    mark_as_read(self.conn, current["uid"])
+                except Exception:
+                    pass
             self.speech.speak("全てのメールを読み終わりました。")
             self.status_var.set("全て読み終わりました")
 
@@ -599,6 +600,11 @@ class MailReaderApp:
     def _on_close(self):
         self.speech.stop()
         pygame.mixer.quit()
+        if self.conn:
+            try:
+                self.conn.logout()
+            except Exception:
+                pass
         self.root.destroy()
 
 
