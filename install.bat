@@ -22,7 +22,7 @@ if %errorlevel%==0 (
     echo       Python が見つかりません。ダウンロードしてインストールします...
     if not exist "%SCRIPT_DIR%python-3.13.5-amd64.exe" (
         echo       ダウンロード中...
-        powershell -Command "Invoke-WebRequest -Uri '%PYTHON_URL%' -OutFile '%SCRIPT_DIR%python-3.13.5-amd64.exe'"
+        powershell -Command "Invoke-WebRequest -UseBasicParsing -Uri '%PYTHON_URL%' -OutFile '%SCRIPT_DIR%python-3.13.5-amd64.exe'"
         if not exist "%SCRIPT_DIR%python-3.13.5-amd64.exe" (
             echo       [エラー] ダウンロードに失敗しました。インターネット接続を確認してください
             pause
@@ -52,7 +52,7 @@ if %errorlevel%==0 (
     echo       Git が見つかりません。ダウンロードしてインストールします...
     if not exist "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" (
         echo       ダウンロード中...
-        powershell -Command "Invoke-WebRequest -Uri '%GIT_URL%' -OutFile '%SCRIPT_DIR%Git-2.49.0-64-bit.exe'"
+        powershell -Command "Invoke-WebRequest -UseBasicParsing -Uri '%GIT_URL%' -OutFile '%SCRIPT_DIR%Git-2.49.0-64-bit.exe'"
         if not exist "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" (
             echo       [エラー] ダウンロードに失敗しました。インターネット接続を確認してください
             pause
