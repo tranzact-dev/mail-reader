@@ -136,6 +136,44 @@ def group_by_thread(details):
     return list(threads.values())
 
 
+def get_past_emails(conn, sender_email, limit=5):
+    conn.select("INBOX")
+    _, data = conn.search(None, f'FROM "{sender_email}"')
+    msg_ids = data[0].split() if data[0] else []
+    msg_ids = msg_ids[-limit:]
+    results = []
+    for mid in msg_ids:
+        _, msg_data = conn.fetch(mid, "(BODY.PEEK[])")
+        raw = msg_data[0][1]
+        msg = email.message_from_bytes(raw)
+        subject = decode_header_value(msg.get("Subject", ""))
+        date_str = msg.get("Date", "")
+        sender_raw = decode_header_value(msg.get("From", ""))
+        sender_name = parseaddr(sender_raw)[0] or sender_raw
+        body = ""
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain" and not body:
+                charset = part.get_content_charset() or "utf-8"
+                payload = part.get_payload(decode=True)
+                if payload:
+                    body = payload.decode(charset, errors="replace")
+        if not body:
+            for part in msg.walk():
+                if part.get_content_type() == "text/html":
+                    charset = part.get_content_charset() or "utf-8"
+                    payload = part.get_payload(decode=True)
+                    if payload:
+                        body = payload.decode(charset, errors="replace")
+                    break
+        results.append({
+            "sender": sender_name,
+            "subject": subject,
+            "date": date_str,
+            "body": clean_body_for_reading(body)[:1000],
+        })
+    return results
+
+
 def mark_as_read(conn, msg_id):
     conn.store(msg_id, "+FLAGS", "\\Seen")
 
@@ -211,7 +249,7 @@ REPLY_DIRECTIONS = {
 }
 
 
-def generate_reply(sender, subject, body_clean, casual=False, direction="auto"):
+def generate_reply(sender, subject, body_clean, casual=False, direction="auto", past_emails=None):
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     tone = (
         "親しい友人や家族に書くようなくだけた口調（「〜だよ」「ありがとう」「よろしくね」など）"
@@ -219,16 +257,25 @@ def generate_reply(sender, subject, body_clean, casual=False, direction="auto"):
         "一般的な丁寧語（「〜です」「〜します」「よろしくお願いします」など）"
     )
     direction_instruction = REPLY_DIRECTIONS.get(direction, REPLY_DIRECTIONS["auto"])
+
+    history_section = ""
+    if past_emails:
+        history_parts = []
+        for pe in past_emails:
+            history_parts.append(f"日時: {pe['date']}\n差出人: {pe['sender']}\n件名: {pe['subject']}\n本文:\n{pe['body']}")
+        history_section = "\n【過去のやり取り（古い順）】\n" + "\n---\n".join(history_parts) + "\n"
+
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=500,
         messages=[{
             "role": "user",
             "content": f"""以下のメールへの返信を書いてください。
-
-【差出人】{sender}
-【件名】{subject}
-【本文】
+{history_section}
+【今回のメール】
+差出人: {sender}
+件名: {subject}
+本文:
 {body_clean}
 
 【方向性】
@@ -237,9 +284,11 @@ def generate_reply(sender, subject, body_clean, casual=False, direction="auto"):
 【条件】
 - 返信者は80歳の日本人男性です
 - {tone}で書いてください
+- 過去のやり取りの文脈を踏まえて、自然な返信を書いてください
 - 簡潔に、要点だけ返してください
 - 挨拶文と署名は不要です
 - メール本文のみを出力してください（件名やヘッダーは不要）
+- 300文字以内で収めてください
 """
         }],
     )
@@ -405,7 +454,7 @@ class MailReaderApp:
         self.sender_var = tk.StringVar()
         self.sender_label = tk.Label(display_frame, textvariable=self.sender_var,
                                      font=("Meiryo UI", self.font_size),
-                                     bg=bg, fg=accent, anchor="w", wraplength=900)
+                                     bg=bg, fg=accent, anchor="w", justify="left", wraplength=900)
         self.sender_label.pack(fill="x", pady=(10, 2))
 
         self.date_var = tk.StringVar()
@@ -417,7 +466,7 @@ class MailReaderApp:
         self.subject_var = tk.StringVar()
         self.subject_label = tk.Label(display_frame, textvariable=self.subject_var,
                                       font=("Meiryo UI", self.font_size),
-                                      bg=bg, fg=fg, anchor="w", wraplength=900)
+                                      bg=bg, fg=fg, anchor="w", justify="left", wraplength=900)
         self.subject_label.pack(fill="x", pady=(0, 2))
 
         self.attachment_var = tk.StringVar()
@@ -783,6 +832,12 @@ class MailReaderApp:
     def _generate_draft(self):
         email_data = self._current_email()
         try:
+            past = []
+            if self.conn and email_data.get("sender_email"):
+                try:
+                    past = get_past_emails(self.conn, email_data["sender_email"])
+                except Exception:
+                    pass
             casual = is_casual_contact(email_data["sender"])
             draft = generate_reply(
                 email_data["sender"],
@@ -790,6 +845,7 @@ class MailReaderApp:
                 email_data["body_clean"],
                 casual=casual,
                 direction=self._reply_direction,
+                past_emails=past,
             )
             self._draft_text = draft
             self.root.after(0, self._show_draft)
@@ -799,16 +855,17 @@ class MailReaderApp:
 
     def _show_draft(self):
         email_data = self._current_email()
-        self.status_var.set(f"返信の下書き → {email_data['sender']}")
-        self.body_text.configure(state="normal")
+        self.status_var.set(f"返信の下書き → {email_data['sender']}（編集できます）")
+        self.body_text.configure(state="normal", cursor="xterm", insertbackground="#f9a825", insertwidth=3)
         self.body_text.delete("1.0", "end")
         self.body_text.insert("1.0", self._draft_text)
-        self.body_text.configure(state="disabled")
+        self.body_text.focus_set()
         self.speech.speak(f"下書きを読み上げます。{self._draft_text}")
 
     def _read_draft(self):
-        if self._draft_text:
-            self.speech.speak(self._draft_text)
+        current_text = self.body_text.get("1.0", "end").strip()
+        if current_text:
+            self.speech.speak(current_text)
 
     def _retry_reply(self):
         self.speech.stop()
@@ -822,6 +879,7 @@ class MailReaderApp:
 
     def _send_reply(self):
         email_data = self._current_email()
+        self._draft_text = self.body_text.get("1.0", "end").strip()
         if not email_data or not self._draft_text:
             return
         if DRY_RUN:
@@ -853,6 +911,7 @@ class MailReaderApp:
     def _cancel_reply(self):
         self.speech.stop()
         self._draft_text = ""
+        self.body_text.configure(state="disabled")
         self._show_mail_buttons()
         self._show_current()
 
