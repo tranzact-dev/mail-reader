@@ -22,21 +22,26 @@ python --version
 ```
 `Python 3.13.x` と表示されればOK。
 
-### 2. アプリのダウンロード
+### 2. Git のインストール
 
-#### 方法A: Git がある場合
+起動時の自動更新に必要です。
+
+1. https://git-scm.com/downloads/win にアクセス
+2. 「64-bit Git for Windows Setup」をクリック
+3. ダウンロードした `Git-x.xx.x-64-bit.exe` を実行
+4. すべてデフォルト設定のまま「Next」→「Install」
+
+### 3. アプリのダウンロード
+
+コマンドプロンプトで以下を実行:
 ```
+cd C:\
 git clone https://github.com/tranzact-dev/mail-reader.git
-cd mail-reader
-git checkout develop
 ```
 
-#### 方法B: Git がない場合
-1. https://github.com/tranzact-dev/mail-reader にアクセス
-2. 緑の「Code」ボタン → 「Download ZIP」
-3. ZIPを展開し、任意の場所に配置（例: `C:\mail-reader`）
+`C:\mail-reader` フォルダが作成されます。
 
-### 3. 依存パッケージのインストール
+### 4. 依存パッケージのインストール
 
 コマンドプロンプトでアプリのフォルダに移動し、以下を実行:
 
@@ -47,7 +52,7 @@ pip install -r requirements.txt
 
 全パッケージが `Successfully installed` と表示されればOK。
 
-### 4. 環境設定ファイルの作成
+### 5. 環境設定ファイルの作成
 
 アプリのフォルダに `.env` ファイルを作成し、以下の内容を記入:
 
@@ -62,7 +67,7 @@ CASUAL_CONTACTS=
 - `BIGLOBE_EMAIL` / `BIGLOBE_PASSWORD`: BIGLOBEメールのログイン情報
 - `CASUAL_CONTACTS`: くだけた口調で返信する相手の名前（カンマ区切り、空でも可）
 
-### 5. 本番モードへの切替
+### 6. 本番モードへの切替
 
 `mail_reader_gui.py` の29行目:
 ```python
@@ -70,30 +75,18 @@ DRY_RUN = True   ← テスト中はこのまま
 DRY_RUN = False  ← 本番運用時に変更（メール送信・既読マークが有効になる）
 ```
 
-### 6. 起動
-
-```
-cd C:\mail-reader
-python mail_reader_gui.py
-```
-
-アプリが全画面で起動し、未読メールの読み上げが自動的に始まります。
-
-## デスクトップショートカットの作成（任意）
-
-ダブルクリックで起動できるようにする手順:
+### 7. デスクトップショートカットの作成
 
 1. デスクトップを右クリック → 「新規作成」→「ショートカット」
 2. 場所に以下を入力:
    ```
-   pythonw.exe C:\mail-reader\mail_reader_gui.py
+   C:\mail-reader\start.bat
    ```
 3. 名前を「メール読み上げ」に設定
-4. 作成されたショートカットを右クリック → プロパティ
-5. 「作業フォルダー」に `C:\mail-reader` を入力
-6. 「OK」
+4. 「完了」
 
-> `pythonw.exe` を使うと、コマンドプロンプトの黒い画面が表示されません。
+`start.bat` は起動時に自動で最新版を取得（`git pull`）してからアプリを起動します。
+こちらが master ブランチを更新すれば、次回起動時に自動反映されます。
 
 ## トラブルシューティング
 
@@ -125,11 +118,10 @@ pip install -r requirements.txt
 
 ## アップデート方法
 
-Git がある場合:
+通常のアップデートは自動です。`start.bat`（デスクトップショートカット）から起動すれば、毎回最新版が自動取得されます。
+
+依存パッケージが追加された場合のみ、手動で以下を実行してください:
 ```
 cd C:\mail-reader
-git pull
 pip install -r requirements.txt
 ```
-
-Git がない場合: 最新のZIPをダウンロードし、既存ファイルを上書き。`.env` は上書きしないよう注意。
