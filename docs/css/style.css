@@ -176,5 +176,5 @@ html, body {
 #btn-next:hover { background: #475569; }
 #btn-refresh { background: #0d47a1; }
 #btn-refresh:hover { background: #1565c0; }
-#btn-logout { background: #424242; color: var(--fg); }
-#btn-logout:hover { background: #616161; }
+#btn-exit { background: #424242; color: var(--fg); }
+#btn-exit:hover { background: #616161; }
