@@ -18,39 +18,53 @@ async function init() {
   document.getElementById("btn-refresh").addEventListener("click", () => ui.refresh());
   document.getElementById("btn-font-up").addEventListener("click", () => ui.fontLarger());
   document.getElementById("btn-font-down").addEventListener("click", () => ui.fontSmaller());
-  document.getElementById("btn-logout").addEventListener("click", handleLogout);
+  document.getElementById("btn-exit").addEventListener("click", handleExit);
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") ui.stop();
   });
 
   await gmailClient.init();
+  await tryAutoLogin();
+}
+
+async function tryAutoLogin() {
+  try {
+    await gmailClient.requestAuth();
+    await loadAndPlay();
+  } catch {
+    // セッション切れ or 初回 → ログインボタン表示のまま
+  }
 }
 
 async function handleLogin() {
   try {
     await gmailClient.requestAuth();
-    ui.showMainScreen();
-    ui.showMessage("メールを読み込み中...");
-    const data = await gmailClient.fetchAllUnread();
-    if (data.error === "label-not-found") {
-      ui.showMessage("ラベルが見つかりません");
-      return;
-    }
-    if (data.threads.length === 0) {
-      ui.showMessage("未読メールはありません");
-      speechController.speak("未読メールはありません。");
-      return;
-    }
-    ui.setEmailData(data);
-    ui.showCurrent();
-    ui.play();
+    await loadAndPlay();
   } catch (e) {
     ui.showMessage("ログインに失敗しました: " + e.message);
   }
 }
 
-function handleLogout() {
+async function loadAndPlay() {
+  ui.showMainScreen();
+  ui.showMessage("メールを読み込み中...");
+  const data = await gmailClient.fetchAllUnread();
+  if (data.error === "label-not-found") {
+    ui.showMessage("ラベルが見つかりません");
+    return;
+  }
+  if (data.threads.length === 0) {
+    ui.showMessage("未読メールはありません");
+    speechController.speak("未読メールはありません。");
+    return;
+  }
+  ui.setEmailData(data);
+  ui.showCurrent();
+  ui.play();
+}
+
+function handleExit() {
   ui.stop();
   gmailClient.signOut();
   ui.showAuthScreen();

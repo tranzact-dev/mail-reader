@@ -32,11 +32,7 @@ class GmailClient {
   }
 
   signOut() {
-    const token = gapi.client.getToken();
-    if (token) {
-      google.accounts.oauth2.revoke(token.access_token);
-      gapi.client.setToken(null);
-    }
+    gapi.client.setToken(null);
   }
 
   async _apiCall(fn) {
