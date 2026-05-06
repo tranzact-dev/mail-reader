@@ -59,7 +59,7 @@ def connect_imap():
     return conn
 
 
-def get_unread_messages(conn, days=10):
+def get_unread_messages(conn, days=30):
     conn.select("INBOX")
     since = (datetime.now() - timedelta(days=days)).strftime("%d-%b-%Y")
     _, data = conn.search(None, f"UNSEEN SINCE {since}")
@@ -120,6 +120,35 @@ def get_message_detail(conn, msg_id):
         "date": date_display,
         "has_attachment": has_attachment,
     }
+
+
+def download_and_open_attachments(conn, msg_id):
+    _, data = conn.fetch(msg_id, "(BODY.PEEK[])")
+    raw = data[0][1]
+    msg = email.message_from_bytes(raw)
+    opened = 0
+    for part in msg.walk():
+        content_disposition = str(part.get("Content-Disposition", ""))
+        if "attachment" not in content_disposition:
+            continue
+        filename = part.get_filename()
+        if filename:
+            filename = decode_header_value(filename)
+        if not filename:
+            continue
+        if filename.lower() in ("winmail.dat", "smime.p7s"):
+            continue
+        payload = part.get_payload(decode=True)
+        if not payload:
+            continue
+        tmp_dir = os.path.join(tempfile.gettempdir(), "mail_reader_attachments")
+        os.makedirs(tmp_dir, exist_ok=True)
+        filepath = os.path.join(tmp_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(payload)
+        os.startfile(filepath)
+        opened += 1
+    return opened
 
 
 def normalize_subject(subject):
@@ -509,6 +538,10 @@ class MailReaderApp:
                                   command=self._next, **btn_style)
         self.btn_next.pack(side="left", padx=15, expand=True)
 
+        self.btn_attachment = tk.Button(self.mail_btn_frame, text="📎 添付を開く", bg="#795548", fg="white",
+                                       activebackground="#8d6e63", activeforeground="white",
+                                       command=self._open_attachments, **btn_style)
+
         self.btn_reply = tk.Button(self.mail_btn_frame, text="✉ 返信", bg="#6a1b9a", fg="white",
                                    activebackground="#7b1fa2", activeforeground="white",
                                    command=self._start_reply, **btn_style)
@@ -573,7 +606,8 @@ class MailReaderApp:
 
         self.btn_play.focus_set()
         all_btns = [self.btn_play, self.btn_stop, self.btn_prev, self.btn_repeat, self.btn_next,
-                     self.btn_reply, self.btn_refresh, self.btn_quit, self.btn_font_up, self.btn_font_down,
+                     self.btn_attachment, self.btn_reply, self.btn_refresh, self.btn_quit,
+                     self.btn_font_up, self.btn_font_down,
                      self.btn_accept, self.btn_decline, self.btn_hold, self.btn_auto, self.btn_cancel_direction,
                      self.btn_send, self.btn_read_draft, self.btn_retry, self.btn_cancel_reply]
         for btn in all_btns:
@@ -662,8 +696,10 @@ class MailReaderApp:
         self.subject_var.set(f"件名: {email_data['subject']}")
         if email_data.get("has_attachment"):
             self.attachment_var.set("📎 添付ファイルあり")
+            self.btn_attachment.pack(side="left", padx=15, expand=True, before=self.btn_reply)
         else:
             self.attachment_var.set("")
+            self.btn_attachment.pack_forget()
 
         self.body_text.configure(state="normal")
         self.body_text.delete("1.0", "end")
@@ -736,6 +772,27 @@ class MailReaderApp:
 
     def _repeat(self):
         self._play()
+
+    def _open_attachments(self):
+        email_data = self._current_email()
+        if not email_data or not self.conn:
+            return
+        self.speech.stop()
+        self.speech.speak("添付ファイルを開いています。")
+
+        def do_open():
+            try:
+                count = download_and_open_attachments(self.conn, email_data["uid"])
+                if count == 0:
+                    self.root.after(0, lambda: self.speech.speak("添付ファイルが見つかりませんでした。"))
+                else:
+                    msg = f"{count}件の添付ファイルを開きました。"
+                    self.root.after(0, lambda: self.speech.speak(msg))
+            except Exception as e:
+                err_msg = f"添付ファイルエラー: {e}"
+                self.root.after(0, lambda: self.speech.speak(err_msg))
+
+        threading.Thread(target=do_open, daemon=True).start()
 
     def _advance(self):
         thread = self._current_thread()
