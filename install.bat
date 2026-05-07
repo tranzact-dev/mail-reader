@@ -112,8 +112,7 @@ echo.
 
 :: --- デスクトップショートカット ---
 echo デスクトップショートカットを作成しています...
-set "SHORTCUT=%USERPROFILE%\Desktop\メール読み上げ.lnk"
-powershell -Command "$ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut('%SHORTCUT%'); $sc.TargetPath = '%INSTALL_DIR%\start.bat'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Description = 'メール読み上げアプリ'; $sc.Save()"
+powershell -Command "$desktop = [Environment]::GetFolderPath('Desktop'); $ws = New-Object -ComObject WScript.Shell; $sc = $ws.CreateShortcut(\"$desktop\メール読み上げ.lnk\"); $sc.TargetPath = '%INSTALL_DIR%\start.bat'; $sc.WorkingDirectory = '%INSTALL_DIR%'; $sc.Description = 'メール読み上げアプリ'; $sc.Save()"
 echo       完了
 echo.
 
