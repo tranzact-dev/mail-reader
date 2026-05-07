@@ -439,7 +439,7 @@ class MailReaderApp:
         self.threads = []
         self.thread_index = 0
         self.msg_index = 0
-        self.font_size = 26
+        self.font_size = 46
         self._highlight_search_pos = "1.0"
         self._pending_announce = None
         self._play_gen = 0
@@ -731,7 +731,7 @@ class MailReaderApp:
         self._highlight_search_pos = "1.0"
 
     def _font_larger(self):
-        self.font_size = min(self.font_size + 4, 48)
+        self.font_size = min(self.font_size + 4, 72)
         self._apply_font_size()
 
     def _font_smaller(self):
