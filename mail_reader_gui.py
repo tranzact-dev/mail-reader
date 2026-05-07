@@ -26,7 +26,7 @@ SMTP_SERVER = "mail.biglobe.ne.jp"
 SMTP_PORT = 465
 BIGLOBE_EMAIL = os.getenv("BIGLOBE_EMAIL", "")
 BIGLOBE_PASSWORD = os.getenv("BIGLOBE_PASSWORD", "")
-DRY_RUN = True
+DRY_RUN = False
 
 CASUAL_CONTACTS = [
     name.strip() for name in os.getenv("CASUAL_CONTACTS", "").split(",") if name.strip()
@@ -246,7 +246,7 @@ def clean_body_for_reading(body):
 
 # --- SMTP送信 ---
 
-def send_reply(to_addr, subject, body, in_reply_to=""):
+def send_reply(to_addr, subject, body, in_reply_to="", imap_conn=None):
     reply_subject = subject if subject.lower().startswith("re:") else f"Re: {subject}"
     msg = MIMEText(body, "plain", "utf-8")
     msg["From"] = BIGLOBE_EMAIL
@@ -259,6 +259,12 @@ def send_reply(to_addr, subject, body, in_reply_to=""):
     with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
         server.login(BIGLOBE_EMAIL, BIGLOBE_PASSWORD)
         server.send_message(msg)
+
+    if imap_conn:
+        try:
+            imap_conn.append("Sent", "\\Seen", None, msg.as_bytes())
+        except Exception:
+            pass
 
 
 # --- AI返信生成 ---
@@ -953,6 +959,7 @@ class MailReaderApp:
                     email_data["subject"],
                     self._draft_text,
                     in_reply_to=email_data.get("message_id", ""),
+                    imap_conn=self.conn,
                 )
                 self.root.after(0, self._on_send_success)
             except Exception as e:
