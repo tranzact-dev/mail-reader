@@ -30,8 +30,10 @@ if %errorlevel%==0 (
         )
         echo       ダウンロード完了
     )
-    echo       インストール中...
+    echo       インストール中（1〜2分かかります）...
     "%SCRIPT_DIR%python-3.13.5-amd64.exe" /quiet InstallAllUsers=1 PrependPath=1 Include_launcher=1
+    set "PATH=C:\Program Files\Python313;C:\Program Files\Python313\Scripts;%PATH%"
+    python --version >nul 2>&1
     if %errorlevel%==0 (
         echo       Python インストール完了
     ) else (
@@ -39,7 +41,6 @@ if %errorlevel%==0 (
         pause
         exit /b 1
     )
-    set "PATH=C:\Program Files\Python313;C:\Program Files\Python313\Scripts;%PATH%"
 )
 echo.
 
@@ -62,6 +63,8 @@ if %errorlevel%==0 (
     )
     echo       インストール中...
     "%SCRIPT_DIR%Git-2.49.0-64-bit.exe" /VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /COMPONENTS="icons,ext\reg\shellhere,assoc,assoc_sh"
+    set "PATH=C:\Program Files\Git\cmd;%PATH%"
+    git --version >nul 2>&1
     if %errorlevel%==0 (
         echo       Git インストール完了
     ) else (
@@ -69,7 +72,6 @@ if %errorlevel%==0 (
         pause
         exit /b 1
     )
-    set "PATH=C:\Program Files\Git\cmd;%PATH%"
 )
 echo.
 
