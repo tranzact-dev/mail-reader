@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>メール読み上げアプリ 取扱説明書</title>
+<style>
+  body {
+    font-family: "Meiryo UI", "Yu Gothic", sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    color: #333;
+    line-height: 1.8;
+  }
+  h1 {
+    text-align: center;
+    border-bottom: 3px solid #1a1a2e;
+    padding-bottom: 16px;
+    margin-bottom: 40px;
+  }
+  h2 {
+    background: #1a1a2e;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 6px;
+    margin-top: 50px;
+  }
+  h3 {
+    border-left: 5px solid #4fc3f7;
+    padding-left: 12px;
+    margin-top: 30px;
+  }
+  .screenshot {
+    text-align: center;
+    margin: 24px 0;
+  }
+  .screenshot img {
+    max-width: 100%;
+    border: 2px solid #ccc;
+    border-radius: 8px;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.15);
+  }
+  .caption {
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+    margin-top: 8px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 10px 14px;
+    text-align: left;
+  }
+  th {
+    background: #f0f0f0;
+  }
+  .btn-label {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 4px;
+    color: #fff;
+    font-weight: bold;
+    font-size: 14px;
+  }
+  .btn-play { background: #1b5e20; }
+  .btn-stop { background: #b71c1c; }
+  .btn-nav { background: #334155; }
+  .btn-repeat { background: #e65100; }
+  .btn-attach { background: #795548; }
+  .btn-reply { background: #6a1b9a; }
+  .btn-refresh { background: #0d47a1; }
+  .btn-quit { background: #424242; }
+  .btn-accept { background: #1b5e20; }
+  .btn-decline { background: #b71c1c; }
+  .btn-hold { background: #e65100; }
+  .btn-auto { background: #6a1b9a; }
+  .btn-send { background: #1b5e20; }
+  .btn-read { background: #0d47a1; }
+  .note {
+    background: #fff8e1;
+    border-left: 4px solid #ffc107;
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .step {
+    counter-increment: step;
+    margin: 20px 0;
+    padding-left: 40px;
+    position: relative;
+  }
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0;
+    background: #1a1a2e;
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 28px;
+    font-weight: bold;
+    font-size: 14px;
+  }
+  .steps {
+    counter-reset: step;
+  }
+  footer {
+    text-align: center;
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid #ccc;
+    color: #999;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>メール読み上げアプリ<br>取扱説明書</h1>
+
+<h2>1. アプリの概要</h2>
+
+<p>このアプリは、BIGLOBEメールの未読メールを<strong>音声で読み上げ</strong>、<strong>ボタン操作だけ</strong>で返信まで行えるアプリケーションです。</p>
+
+<p>主な機能:</p>
+<ul>
+  <li>未読メールの自動読み上げ</li>
+  <li>読み上げ中の文をハイライト表示</li>
+  <li>AIによる返信文の自動作成</li>
+  <li>添付ファイルを開く</li>
+  <li>文字サイズの変更</li>
+</ul>
+
+<h2>2. 起動方法</h2>
+
+<p>デスクトップの<strong>「メール読み上げ」</strong>をダブルクリックしてください。</p>
+<p>起動すると自動的にメールを取得し、読み上げが始まります。</p>
+
+<h2>3. メール画面</h2>
+
+<div class="screenshot">
+  <img src="img/Cap1.png" alt="メール表示画面">
+  <div class="caption">メール表示画面</div>
+</div>
+
+<p>画面の構成:</p>
+<ul>
+  <li><strong>上部</strong>: 現在のスレッド番号（例: スレッド 3/12）</li>
+  <li><strong>中央上</strong>: 差出人、日時、件名</li>
+  <li><strong>中央</strong>: メール本文（読み上げ中はハイライト表示）</li>
+  <li><strong>下部</strong>: 操作ボタン</li>
+</ul>
+
+<h3>操作ボタン一覧</h3>
+
+<table>
+  <tr>
+    <th>ボタン</th>
+    <th>機能</th>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-play">&#9654; 再生</span></td>
+    <td>現在のメールを読み上げます</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-stop">&#9632; 停止</span></td>
+    <td>読み上げを止めます</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-nav">&#9194; 前へ</span></td>
+    <td>前のメールに戻ります</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-repeat">&#8635; 聞き直す</span></td>
+    <td>今のメールをもう一度読み上げます</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-nav">次へ &#9193;</span></td>
+    <td>次のメールに進みます</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-attach">&#128206; 添付を開く</span></td>
+    <td>添付ファイルを開きます（添付ありの場合のみ表示）</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-reply">&#9993; 返信</span></td>
+    <td>返信を作成します</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-refresh">&#128260; 更新</span></td>
+    <td>新しいメールがないか確認します</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-quit">&#10005; 終了</span></td>
+    <td>アプリを終了します</td>
+  </tr>
+</table>
+
+<h3>文字サイズの変更</h3>
+
+<p>画面右上の <strong>A+</strong>（大きく）/ <strong>A-</strong>（小さく）ボタンで調整できます。</p>
+
+<h2>4. 添付ファイル</h2>
+
+<div class="screenshot">
+  <img src="img/Cap4.png" alt="添付ファイルありのメール">
+  <div class="caption">添付ファイルありのメール表示</div>
+</div>
+
+<p>添付ファイルがあるメールには「添付ファイルあり」と表示され、<span class="btn-label btn-attach">&#128206; 添付を開く</span> ボタンが現れます。</p>
+<p>ボタンを押すと、添付ファイルがパソコンの対応アプリで開きます。</p>
+
+<h2>5. 返信の作成</h2>
+
+<p>メール画面で <span class="btn-label btn-reply">&#9993; 返信</span> を押すと、返信作成が始まります。</p>
+
+<h3>ステップ1: 方向性の選択</h3>
+
+<div class="screenshot">
+  <img src="img/Cap2.png" alt="方向性選択画面">
+  <div class="caption">返信の方向性を選ぶ画面</div>
+</div>
+
+<p>AIに返信の方向性を指示します。</p>
+
+<table>
+  <tr>
+    <th>ボタン</th>
+    <th>内容</th>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-accept">&#128077; 承諾</span></td>
+    <td>「問題ありません」「進めてください」のような返信</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-decline">&#128078; 辞退</span></td>
+    <td>「今回は見送らせていただきます」のような返信</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-hold">&#9203; 保留</span></td>
+    <td>「確認して後日ご連絡します」のような返信</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-auto">&#10024; おまかせ</span></td>
+    <td>AIがメール内容から適切な返信を判断</td>
+  </tr>
+</table>
+
+<h3>ステップ2: 下書きの確認・編集</h3>
+
+<div class="screenshot">
+  <img src="img/Cap3.png" alt="返信下書き画面">
+  <div class="caption">AIが作成した返信の下書き</div>
+</div>
+
+<p>AIが返信文を作成し、画面に表示されます。内容は読み上げられます。</p>
+<p>画面上で直接文章を修正することもできます。</p>
+
+<table>
+  <tr>
+    <th>ボタン</th>
+    <th>機能</th>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-send">&#128228; 送信</span></td>
+    <td>返信メールを送信します</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-read">&#9654; 読み上げ</span></td>
+    <td>下書きの内容を読み上げます</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-repeat">&#8635; やり直す</span></td>
+    <td>AIにもう一度下書きを作り直させます</td>
+  </tr>
+  <tr>
+    <td><span class="btn-label btn-quit">&#8592; 戻る</span></td>
+    <td>送信せずにメール画面に戻ります</td>
+  </tr>
+</table>
+
+<h2>6. 基本的な使い方</h2>
+
+<div class="steps">
+  <div class="step">アプリを起動すると、未読メールの読み上げが自動的に始まります。</div>
+  <div class="step">1通読み終わると、自動的に次のメールに進みます。</div>
+  <div class="step">もう一度聞きたいときは <span class="btn-label btn-repeat">&#8635; 聞き直す</span> を押します。</div>
+  <div class="step">返信したいときは <span class="btn-label btn-reply">&#9993; 返信</span> → 方向性を選択 → 内容を確認 → <span class="btn-label btn-send">&#128228; 送信</span> を押します。</div>
+  <div class="step">全てのメールを読み終わると「全てのメールを読み終わりました」と音声で通知されます。</div>
+  <div class="step">終わったら <span class="btn-label btn-quit">&#10005; 終了</span> を押します。</div>
+</div>
+
+<div class="note">
+  <strong>ヒント:</strong> 新しいメールが届いたか確認したいときは <span class="btn-label btn-refresh">&#128260; 更新</span> を押してください。
+</div>
+
+<h2>7. 困ったときは</h2>
+
+<table>
+  <tr>
+    <th>症状</th>
+    <th>対処</th>
+  </tr>
+  <tr>
+    <td>音声が聞こえない</td>
+    <td>パソコンの音量を確認してください</td>
+  </tr>
+  <tr>
+    <td>「未読メールはありません」と表示される</td>
+    <td>新しいメールがないか、Webメールで確認してください</td>
+  </tr>
+  <tr>
+    <td>アプリが動かない</td>
+    <td>一度終了して、もう一度起動してください</td>
+  </tr>
+  <tr>
+    <td>上記で解決しない場合</td>
+    <td>開発元にご連絡ください（下記参照）</td>
+  </tr>
+</table>
+
+<h2>8. お問い合わせ</h2>
+
+<p>
+  開発責任者：谷川郁男<br>
+  Mail：tanikawa@tranzact.co.jp<br>
+  Mobile：090-4194-4069
+</p>
+
+<footer>
+  メール読み上げアプリ 取扱説明書 v1.0
+</footer>
+
+</body>
+</html>
