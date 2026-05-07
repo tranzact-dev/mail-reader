@@ -59,14 +59,6 @@ install.bat が自動で以下を実行します:
 
 → install.bat を管理者として再実行してください。
 
-### 「ModuleNotFoundError: No module named 'xxx'」と表示される
-
-→ 依存パッケージが不足しています。コマンドプロンプトで以下を実行:
-```
-cd C:\mail-reader
-pip install -r requirements.txt
-```
-
 ### 「未読メールはありません」と表示されるが実際には未読がある
 
 → `C:\mail-reader\.env` のメールアドレス・パスワードを確認してください。
@@ -79,9 +71,14 @@ pip install -r requirements.txt
 
 ### 返信が生成されない（「返信を考えています」のまま止まる）
 
-→ `.env` の ANTHROPIC_API_KEY を確認してください。
-→ APIクレジット残高: https://console.anthropic.com/
+→ 開発元にお問い合わせください。
 
 ## アップデート
 
 自動です。デスクトップのショートカットから起動するたびに、最新版を自動取得します。
+
+## お問い合わせ
+
+開発責任者：谷川郁男
+Mail：tanikawa@tranzact.co.jp
+Mobile：090-4194-4069
