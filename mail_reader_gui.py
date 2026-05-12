@@ -54,8 +54,27 @@ def decode_header_value(value):
 
 
 def connect_imap():
-    conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
-    conn.login(BIGLOBE_EMAIL, BIGLOBE_PASSWORD)
+    if not BIGLOBE_EMAIL or not BIGLOBE_PASSWORD:
+        raise ConnectionError(
+            "メールの設定が見つかりません。\n"
+            "開発者（谷川）に連絡してください。\n"
+            "090-4194-4069"
+        )
+    try:
+        conn = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
+    except Exception:
+        raise ConnectionError(
+            "メールサーバーに接続できません。\n"
+            "インターネット接続を確認してください。"
+        )
+    try:
+        conn.login(BIGLOBE_EMAIL, BIGLOBE_PASSWORD)
+    except imaplib.IMAP4.error:
+        raise ConnectionError(
+            "メールにログインできません。\n"
+            "開発者（谷川）に連絡してください。\n"
+            "090-4194-4069"
+        )
     return conn
 
 
@@ -657,7 +676,9 @@ class MailReaderApp:
                 self.root.after(0, self._show_current)
                 self.root.after(0, self._play)
             except Exception as e:
-                self.root.after(0, lambda: self._show_message(f"エラー: {e}"))
+                msg = str(e)
+                self.root.after(0, lambda: self._show_message(msg))
+                self.root.after(0, lambda: self.speech.speak(msg))
 
         threading.Thread(target=load, daemon=True).start()
 
