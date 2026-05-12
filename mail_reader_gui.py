@@ -300,10 +300,11 @@ REPLY_DIRECTIONS = {
     "decline": "相手の提案・依頼をやんわり辞退・見送る方向で返信してください。「今回は見送らせていただきます」のようなニュアンスで。",
     "hold": "保留・検討中であることを伝える方向で返信してください。「確認して後日ご連絡します」のようなニュアンスで。",
     "auto": "メールの内容に応じて、最も適切な返信を書いてください。",
+    "keyword": "ユーザーから以下のキーワード・意向が与えられました:\n{keywords}\n\nメール本文の文脈を踏まえて、上記キーワードの意図を解釈し、自然なビジネスメールの返信に仕上げてください。キーワードは箇条書きや断片的な表現ですが、メールの内容と照合して適切に文章化してください。",
 }
 
 
-def generate_reply(sender, subject, body_clean, casual=False, direction="auto", past_emails=None):
+def generate_reply(sender, subject, body_clean, casual=False, direction="auto", past_emails=None, keywords=None):
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     tone = (
         "親しい友人や家族に書くようなくだけた口調（「〜だよ」「ありがとう」「よろしくね」など）"
@@ -311,6 +312,8 @@ def generate_reply(sender, subject, body_clean, casual=False, direction="auto", 
         "一般的な丁寧語（「〜です」「〜します」「よろしくお願いします」など）"
     )
     direction_instruction = REPLY_DIRECTIONS.get(direction, REPLY_DIRECTIONS["auto"])
+    if direction == "keyword" and keywords:
+        direction_instruction = direction_instruction.format(keywords=keywords)
 
     history_section = ""
     if past_emails:
@@ -343,6 +346,7 @@ def generate_reply(sender, subject, body_clean, casual=False, direction="auto", 
 - 挨拶文と署名は不要です
 - メール本文のみを出力してください（件名やヘッダーは不要）
 - 300文字以内で収めてください
+- 返信者は身体が不自由なため、入力に誤字・誤変換が多い場合があります。メール本文の文脈から意図を推測して正しく解釈してください
 """
         }],
     )
@@ -464,6 +468,7 @@ class MailReaderApp:
         self._play_gen = 0
         self._draft_text = ""
         self._reply_direction = "auto"
+        self._reply_keywords = ""
 
         self._build_ui()
         self.root.after(100, self._load_emails)
@@ -492,15 +497,16 @@ class MailReaderApp:
                                      command=self._font_larger, **font_btn_style)
         self.btn_font_up.pack(side="right", padx=(0, 5), pady=5)
 
-        # メール操作ボタン
-        self.mail_btn_frame = tk.Frame(self.root, bg=bg, pady=20)
-        self.mail_btn_frame.pack(side="bottom", fill="x")
+        # ボタンコンテナ（常に画面下部に固定）
+        self.btn_container = tk.Frame(self.root, bg=bg)
+        self.btn_container.pack(side="bottom", fill="x")
 
-        # 返信方向性選択ボタン（初期非表示）
-        self.direction_btn_frame = tk.Frame(self.root, bg=bg, pady=20)
+        self.mail_btn_frame = tk.Frame(self.btn_container, bg=bg, pady=20)
+        self.mail_btn_frame.pack(fill="x")
 
-        # 返信操作ボタン（初期非表示）
-        self.reply_btn_frame = tk.Frame(self.root, bg=bg, pady=20)
+        self.direction_btn_frame = tk.Frame(self.btn_container, bg=bg, pady=20)
+        self.reply_btn_frame = tk.Frame(self.btn_container, bg=bg, pady=20)
+        self.keyword_btn_frame = tk.Frame(self.btn_container, bg=bg, pady=20)
 
         display_frame = tk.Frame(self.root, bg=bg, padx=30, pady=10)
         display_frame.pack(fill="both", expand=True)
@@ -603,6 +609,11 @@ class MailReaderApp:
                                   command=lambda: self._pick_direction("auto"), **btn_style)
         self.btn_auto.pack(side="left", padx=15, expand=True)
 
+        self.btn_keyword = tk.Button(self.direction_btn_frame, text="✏ キーワード", bg="#00695c", fg="white",
+                                     activebackground="#00897b", activeforeground="white",
+                                     command=self._show_keyword_input, **btn_style)
+        self.btn_keyword.pack(side="left", padx=15, expand=True)
+
         self.btn_cancel_direction = tk.Button(self.direction_btn_frame, text="← 戻る", bg="#424242", fg="#e0e0e0",
                                               activebackground="#616161", activeforeground="white",
                                               command=self._cancel_reply, **btn_style)
@@ -629,12 +640,37 @@ class MailReaderApp:
                                           command=self._cancel_reply, **btn_style)
         self.btn_cancel_reply.pack(side="left", padx=15, expand=True)
 
+        # --- キーワード入力画面 ---
+        keyword_input_frame = tk.Frame(self.keyword_btn_frame, bg=bg)
+        keyword_input_frame.pack(fill="x", padx=30, pady=(0, 15))
+
+        self.keyword_entry = tk.Entry(keyword_input_frame, font=("Meiryo UI", 28),
+                                      bg="#16213e", fg=fg, insertbackground="#f9a825",
+                                      insertwidth=3, relief="flat")
+        self.keyword_entry.pack(fill="x", ipady=10)
+        self.keyword_entry.bind("<Return>", lambda e: self._generate_from_keywords())
+
+        keyword_action_frame = tk.Frame(self.keyword_btn_frame, bg=bg)
+        keyword_action_frame.pack(fill="x")
+
+        self.btn_keyword_generate = tk.Button(keyword_action_frame, text="✨ 生成", bg="#1b5e20", fg="white",
+                                              activebackground="#2e7d32", activeforeground="white",
+                                              command=self._generate_from_keywords, **btn_style)
+        self.btn_keyword_generate.pack(side="left", padx=15, expand=True)
+
+        self.btn_keyword_back = tk.Button(keyword_action_frame, text="← 戻る", bg="#424242", fg="#e0e0e0",
+                                          activebackground="#616161", activeforeground="white",
+                                          command=self._cancel_keyword_input, **btn_style)
+        self.btn_keyword_back.pack(side="left", padx=15, expand=True)
+
         self.btn_play.focus_set()
         all_btns = [self.btn_play, self.btn_stop, self.btn_prev, self.btn_repeat, self.btn_next,
                      self.btn_attachment, self.btn_reply, self.btn_refresh, self.btn_quit,
                      self.btn_font_up, self.btn_font_down,
-                     self.btn_accept, self.btn_decline, self.btn_hold, self.btn_auto, self.btn_cancel_direction,
-                     self.btn_send, self.btn_read_draft, self.btn_retry, self.btn_cancel_reply]
+                     self.btn_accept, self.btn_decline, self.btn_hold, self.btn_auto,
+                     self.btn_keyword, self.btn_cancel_direction,
+                     self.btn_send, self.btn_read_draft, self.btn_retry, self.btn_cancel_reply,
+                     self.btn_keyword_generate, self.btn_keyword_back]
         for btn in all_btns:
             btn.bind("<Return>", lambda e, b=btn: b.invoke())
             btn.bind("<space>", lambda e, b=btn: b.invoke())
@@ -642,17 +678,26 @@ class MailReaderApp:
     def _show_mail_buttons(self):
         self.direction_btn_frame.pack_forget()
         self.reply_btn_frame.pack_forget()
-        self.mail_btn_frame.pack(side="bottom", fill="x")
+        self.keyword_btn_frame.pack_forget()
+        self.mail_btn_frame.pack(fill="x")
 
     def _show_direction_buttons(self):
         self.mail_btn_frame.pack_forget()
         self.reply_btn_frame.pack_forget()
-        self.direction_btn_frame.pack(side="bottom", fill="x")
+        self.keyword_btn_frame.pack_forget()
+        self.direction_btn_frame.pack(fill="x")
 
     def _show_reply_buttons(self):
         self.mail_btn_frame.pack_forget()
         self.direction_btn_frame.pack_forget()
-        self.reply_btn_frame.pack(side="bottom", fill="x")
+        self.keyword_btn_frame.pack_forget()
+        self.reply_btn_frame.pack(fill="x")
+
+    def _show_keyword_buttons(self):
+        self.mail_btn_frame.pack_forget()
+        self.direction_btn_frame.pack_forget()
+        self.reply_btn_frame.pack_forget()
+        self.keyword_btn_frame.pack(fill="x")
 
     def _load_emails(self):
         def load():
@@ -765,6 +810,7 @@ class MailReaderApp:
         self.subject_label.configure(font=("Meiryo UI", self.font_size))
         self.attachment_label.configure(font=("Meiryo UI", self.font_size - 4))
         self.body_text.configure(font=("Meiryo UI", self.font_size - 2))
+        self.keyword_entry.configure(font=("Meiryo UI", max(self.font_size - 14, 20)))
 
     def _play(self):
         email_data = self._current_email()
@@ -890,6 +936,7 @@ class MailReaderApp:
         if not email_data:
             return
         self.speech.stop()
+        self._reply_keywords = ""
         self._show_direction_buttons()
         self.status_var.set("返信の方向性を選んでください")
         self.body_text.configure(state="normal")
@@ -898,9 +945,46 @@ class MailReaderApp:
                               "👍 承諾 — 問題ありません、進めてください\n"
                               "👎 辞退 — 今回は見送ります\n"
                               "⏳ 保留 — 確認して後日連絡します\n"
-                              "✨ おまかせ — AIにおまかせ")
+                              "✨ おまかせ — AIにおまかせ\n"
+                              "✏ キーワード — キーワードを入力して返信")
         self.body_text.configure(state="disabled")
-        self.speech.speak("返信の方向性を選んでください。承諾、辞退、保留、おまかせ、から選べます。")
+        self.speech.speak("返信の方向性を選んでください。承諾、辞退、保留、おまかせ、キーワード入力、から選べます。")
+
+    def _show_keyword_input(self):
+        self._show_keyword_buttons()
+        self.status_var.set("キーワードを入力してください")
+        self.body_text.configure(state="normal")
+        self.body_text.delete("1.0", "end")
+        self.body_text.insert("1.0", "返信に盛り込みたいキーワードや要点を\n"
+                              "下の入力欄に入力してください。\n\n"
+                              "例: 15時はだめ、16時以降、価格について\n"
+                              "例: 来週火曜日でお願いします\n"
+                              "例: 300冊で了解です")
+        self.body_text.configure(state="disabled")
+        self.keyword_entry.delete(0, "end")
+        self.keyword_entry.focus_set()
+        self.speech.speak("キーワードを入力してください。返信に盛り込みたい内容を短く入力して、生成ボタンを押してください。")
+
+    def _generate_from_keywords(self):
+        keywords = self.keyword_entry.get().strip()
+        if not keywords:
+            self.speech.speak("キーワードを入力してください。")
+            return
+        self._reply_keywords = keywords
+        self._reply_direction = "keyword"
+        self._show_reply_buttons()
+        self.status_var.set("返信の下書きを作成中...")
+        self.body_text.configure(state="normal")
+        self.body_text.delete("1.0", "end")
+        self.body_text.insert("1.0", "返信を考えています...")
+        self.body_text.configure(state="disabled")
+        self.speech.speak("キーワードを元に返信を考えています。少々お待ちください。")
+        threading.Thread(target=self._generate_draft, daemon=True).start()
+
+    def _cancel_keyword_input(self):
+        self.speech.stop()
+        self.keyword_entry.delete(0, "end")
+        self._start_reply()
 
     def _pick_direction(self, direction):
         self._reply_direction = direction
@@ -930,6 +1014,7 @@ class MailReaderApp:
                 casual=casual,
                 direction=self._reply_direction,
                 past_emails=past,
+                keywords=self._reply_keywords if self._reply_direction == "keyword" else None,
             )
             self._draft_text = draft
             self.root.after(0, self._show_draft)
@@ -996,6 +1081,8 @@ class MailReaderApp:
     def _cancel_reply(self):
         self.speech.stop()
         self._draft_text = ""
+        self._reply_keywords = ""
+        self.keyword_entry.delete(0, "end")
         self.body_text.configure(state="disabled")
         self._show_mail_buttons()
         self._show_current()
